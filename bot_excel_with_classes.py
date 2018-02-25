@@ -296,7 +296,7 @@ def func(text):
 
 @bot.message_handler(content_types= 'text')
 def info(text):
-	#if text.data == 'Файл' and text.from_user.id == #id #Алексея Евгеньевича
+	#if text.data == 'Файл' and text.from_user.id == #id 
 	pass
 	# if check_who_is(text.from_user.id):
 	# 	if text.from_user.id == 223103214:
