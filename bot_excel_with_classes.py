@@ -2,12 +2,13 @@ import telebot
 import datetime
 from keyboard import *
 import misk
+from datetime import datetime
 
 from telebot import types
 from copy import deepcopy
 from openpyxl.utils import get_column_letter
-from function import *
-from openpyxl import Workbook
+#from function import *
+#from openpyxl import Workbook
 from openpyxl import load_workbook
 month_table = {'1': "Январь",
 		'2': "Февраль",
@@ -34,7 +35,7 @@ weekday = { '1': "ПН",
 
 
 ROW = 0 # Переменная для записи количества групп
-
+DATES = []
 # def initialization(flag):
 # 	#Получает количество колонок групп при запуске бота
 # 	#После обновления информации
@@ -152,11 +153,12 @@ class Lesson():
 
 	def write_lesson(self, teacher=None, students=None):
 		global current_subject
+		global writing_date
 		lesson_list = []
 		for name in students:
-			lesson_list.append(get_date())
-			lesson_list.append(get_week_day())
-			lesson_list.append(get_month())
+			lesson_list.append(writing_date)
+			lesson_list.append(get_weekday(writing_date))
+			lesson_list.append(get_month(writing_date))
 			lesson_list.append(name)
 			lesson_list.append(current_subject)
 			lesson_list.append(get_mark(name))
@@ -184,7 +186,8 @@ token = misk.token
 bot = telebot.TeleBot(token)
 who_is_absent = []
 who_was = []
-
+sl_u_dates = {}
+writing_date = ''
 
 def get_date():
 	# date_str =''
@@ -196,14 +199,15 @@ def get_date():
 	# #date_str= date_str.replace("-", ".")
 	# print (date_str)
 	# return date_str
-	today = datetime.datetime.today()
-	return  today.strftime("%m.%d.%y") # '04/05/2017'
+	today = datetime.today()
+	return  today#.strftime("%m.%d.%y") # '04/05/2017'
 
 def get_week_day():
-	return weekday[str(datetime.date.isoweekday(datetime.date.today()))]
-
-def get_month():
-	return month_table[str(datetime.date.today().month)]
+	return weekday[str(datetime.date.isoweekday(datetime.today()))]
+def get_weekday(i):
+	return weekday[str(datetime.isoweekday(datetime.strptime(i, '%d.%m.%y')))]
+def get_month(i):
+	return month_table[str(datetime.strptime(i, '%d.%m.%y').month)]
 #def check_who_is()
 
 
@@ -211,18 +215,25 @@ def write_excel(lesson_list):
 		with open ("row.txt", "r") as count:
 			row = count.read()
 		row = int(row)
-		wb = load_workbook('journal.xlsx')
+		wb = load_workbook('my_journal.xlsx')
 
-		sheet = wb.get_sheet_by_name("Журнал")
+		sheet = wb.get_sheet_by_name("Journal")
 
 		for col in range(7):			
 			sheet.cell(column =col+1, row=row, value=lesson_list[col])
 		row+=1
 		cell_ = sheet.cell(column = 1, row = int(row))
 		cell_.number_format = 'DD\.MM\.YY;@'
-		wb.save('journal.xlsx')
+		wb.save('my_journal.xlsx')
 		with open ("row.txt", 'w') as count:
 				count.write(str(row))
+		# wb = load_workbook('journal.xlsx')
+
+		# sheet = wb.get_sheet_by_name("Журнал")
+		# for row in lesson_list:
+		# 	sheet.append(lesson_list)
+
+		# wb.save('journal.xlsx')
 
 
 
@@ -235,68 +246,149 @@ def menu(text):
 
 
 
+@bot.message_handler(commands = ['file'])
+def give_file(text):
+	if text.from_user.id in (325726476 , 223103214):
+		doc = open('journal.xlsx', 'rb')
+		bot.send_document(chat_id= text.chat.id, data = doc)
+
 @bot.message_handler(commands = ['lesson'])
 def msg(text):
 	global teacher
+	global sl_u_dates
+	global DATES
+	slov = {"ВТ": ["Математика"],
+			"ПТ": ["Информатика", "Математика"]}
 	teacher.id = text.from_user.id
 	teacher.name_teacher()
 	lesson.teacher = teacher.name
-	bot.send_message(chat_id=text.chat.id, text = 'Выберите предмет', reply_markup = keyboard_subjects(teacher.subjects))
+	count = 1
+	date = ''
+	temp = []
+	message = ''
+	today = get_date()
+	# with open (str("list_with_dates")+".txt", "r") as file:
+	with open (str(text.from_user.id)+".txt", "r") as file:
+		for line in file:
+			date = line.split(" ")[0]
+			subj = line.split(" ")[1][0:-1]
+			if  datetime.strptime(date, '%d.%m.%y')<=today:
+				DATES.append(date)
+			#print (line)
+				#for i in slov[get_weekday(line)]:
+				#print (i)
+				message += str(count)+". "+ date+ "-"+subj+"\n"
+				temp.append(count)
+				temp.append(date+ "-"+subj)
+				sl_u_dates.update([temp])
+				count+=1
+				temp=[]
+			else:
+				break
+	#bot.send_message(chat_id= text.chat.id, text = str_dates, reply_markup = keyboard_subjects(range(1, size+1)))
+	if count !=1:
+		bot.send_message(chat_id=text.chat.id, text = message, reply_markup = keyboard_subjects(range(1, count)))
+	else:
+		bot.send_message(chat_id=text.chat.id, text = "Нет доступных для записи занятий. Попробуйте позже.")
 
 
-@bot.callback_query_handler(func=lambda c: True)
+@bot.callback_query_handler(func=lambda text: True)
 def func(text):
 		global current_subject
 		global who_was
 		global who_is_absent
 		global students
+		global DATES
+		global sl_u_dates
+		global writing_date
 
-		if text.data == 'Да':
-			bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
-								text = 'По какому предмету?', reply_markup = keyboard_subjects(teacher.subjects))
-		elif text.data == 'Отмена':
+		try:
+			if int(text.data) in sl_u_dates:
+				teacher.subject = sl_u_dates[int(text.data)].split("-")[1]
+				current_subject = sl_u_dates[int(text.data)].split("-")[1]
+				writing_date = sl_u_dates[int(text.data)].split("-")[0]
+				lesson.subject = current_subject
+				name_group = current_subject +'-'+ str(teacher.id)
+				students = lesson.get_list(name_group)
+				who_was = deepcopy(students)
+				bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+				 						text = 'На занятии были все?', reply_markup = keyboard_yes_no(2))
+		except:
+			if text.data == 'Да':
+				bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+									text = 'По какому предмету?', reply_markup = keyboard_subjects(teacher.subjects))
+			elif text.data == 'Отмена':
 
-			bot.edit_message_text(chat_id = text.message.chat.id,
-				 			message_id = text.message.message_id,
-							text = "Отмена")
+				bot.edit_message_text(chat_id = text.message.chat.id,
+					 			message_id = text.message.message_id,
+								text = "Отмена")
 
-		elif text.data == 'Нет':
-			for name in teacher.students:
-				who_is_absent.append(name)
-			lesson.write_lesson()
+			elif text.data == 'Нет':
+				for name in teacher.students:
+					who_is_absent.append(name)
+				lesson.write_lesson()
 
-		elif text.data == 'Нет, не все':
-			bot.edit_message_text(chat_id = text.message.chat.id,message_id = text.message.message_id,
-								 text = "Кого не было?", reply_markup = keyboard_subjects(students))
-
-
-		elif text.data == 'Да, все':
-			bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
-										text = lesson.write_lesson(teacher.name, students))
-		elif text.data == "Всё":
-			bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
-										text = lesson.write_lesson(teacher.name, students))
+			elif text.data == 'Нет, не все':
+				bot.edit_message_text(chat_id = text.message.chat.id,message_id = text.message.message_id,
+									 text = "Кого не было?", reply_markup = keyboard_subjects(students))
 
 
+			elif text.data == 'Да, все':
+				bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+											text = lesson.write_lesson(teacher.name, students))
+				f = open(str(text.from_user.id)+'.txt').read()
+				
+				
+				f = f.replace(writing_date+" "+current_subject+"\n",'')
+				
+				with open (str(text.from_user.id)+'.txt', "w") as file:
+					file.write(f)
+			elif text.data == "Всё":
+				bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+											text = lesson.write_lesson(teacher.name, students))
+				f = open(str(text.from_user.id)+'.txt').read()
+				
+				
+				f = f.replace(writing_date+" "+current_subject+"\n",'')
+				
+				with open (str(text.from_user.id)+'.txt', "w") as file:
+					file.write(f)
+			elif text.data == "Занятия не было":
+				for name in students:
+					who_was.remove(name)
+					who_is_absent.append(name)
+				bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+											text = lesson.write_lesson(teacher.name, students))
+				f = open(str(text.from_user.id)+'.txt').read()
+				
+				
+				f = f.replace(writing_date+" "+current_subject+"\n",'')
+				
+				with open (str(text.from_user.id)+'.txt', "w") as file:
+					file.write(f)
+			# elif int(text.data) in sl_u_dates:
+			# 	teacher.subject = sl_u_dates[int(text.data)].split("-")[1]
+			# 	current_subject = sl_u_dates[int(text.data)].split("-")[1]
+			# 	writing_date = sl_u_dates[int(text.data)].split("-")[0]
+			# 	lesson.subject = current_subject
+			# 	name_group = current_subject +'-'+ str(teacher.id)
+			# 	students = lesson.get_list(name_group)
+			# 	who_was = deepcopy(students)
+			# 	bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
+			# 	 						text = 'На занятии были все?', reply_markup = keyboard_yes_no(2))
 
-		elif text.data in teacher.subjects:
-			current_subject = text.data
-			lesson.subject = current_subject
-			name_group = current_subject +'-'+ str(teacher.id)
-			students = lesson.get_list(name_group)
-			who_was = deepcopy(students)
-			bot.edit_message_text(chat_id = text.message.chat.id, message_id = text.message.message_id,
-			 						text = 'На занятии были все?', reply_markup = keyboard_yes_no(2))
-		else:
-			if text.data in who_was:
-				who_was.remove(text.data)
-				who_is_absent.append(text.data)
-				bot.edit_message_text(chat_id=text.message.chat.id, message_id = text.message.message_id,
-										 text = 'Кого не было?', reply_markup = keyboard_after_delete_name(who_was))
+			#elif text.data in teacher.subjects:
+
+			else:
+				if text.data in who_was:
+					who_was.remove(text.data)
+					who_is_absent.append(text.data)
+					bot.edit_message_text(chat_id=text.message.chat.id, message_id = text.message.message_id,
+											 text = 'Кого не было?', reply_markup = keyboard_after_delete_name(who_was))
 
 @bot.message_handler(content_types= 'text')
-def info(text):
-	#if text.data == 'Файл' and text.from_user.id == #id 
+def create_timetable(text):
+	# if text.data == 'Файл' and text.from_user.id == #id #Алексея Евгеньевича
 	pass
 	# if check_who_is(text.from_user.id):
 	# 	if text.from_user.id == 223103214:
