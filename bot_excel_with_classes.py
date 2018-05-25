@@ -9,45 +9,11 @@ from datetime import datetime
 import cherrypy
 from telebot import types
 from copy import deepcopy
-#from function import *
-#from openpyxl import Workbook
 from openpyxl import load_workbook
 from json import load, dump
 token = misk.token
 bot = telebot.TeleBot(token)
-import requests
 
-# bot.remove_webhook()
-
-
-# from telebot import apihelper
-
-# apihelper.proxy = {'http', 'http://5.101.64.68:57624'}
-
-# WEBHOOK_HOST = '176.124.146.219'
-# WEBHOOK_PORT = 443  # 443, 80, 88 или 8443 (порт должен быть открыт!)
-# WEBHOOK_LISTEN = '176.124.146.219'  # На некоторых серверах придется указывать такой же IP, что и выше
-
-# WEBHOOK_SSL_CERT = 'ssl/webhook_cert.pem'  # Путь к сертификату
-# WEBHOOK_SSL_PRIV = 'ssl/webhook_pkey.pem'  # Путь к приватному ключу
-
-# WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-# WEBHOOK_URL_PATH = "/%s/" % (misk.token)
-
-class WebhookServer(object):
-    @cherrypy.expose
-    def index(self):
-        if 'content-length' in cherrypy.request.headers and \
-                        'content-type' in cherrypy.request.headers and \
-                        cherrypy.request.headers['content-type'] == 'application/json':
-            length = int(cherrypy.request.headers['content-length'])
-            json_string = cherrypy.request.body.read(length).decode("utf-8")
-            update = telebot.types.Update.de_json(json_string)
-            # Эта функция обеспечивает проверку входящего сообщения
-            bot.process_new_updates([update])
-            return ''
-        else:
-            raise cherrypy.HTTPError(403)
 
 month_table = {'1': "Январь",
 		'2': "Февраль",
@@ -156,23 +122,10 @@ class Lesson():
 					break
 		return students
 
-	# def keyboard_for_mark():	
-	# 	keyboard = types.InlineKeyboardMarkup()
-	# 	butns = []
-
-	# 	for name in who_was:
-	# 		butns.append(types.InlineKeyboardButton(text = name, callback_data = name))
-	# 	butns.append(types.InlineKeyboardButton(text = 'Всё', callback_data = "Всё"))
-	# 	butns.append(types.InlineKeyboardButton(text = 'Отмена', callback_data = 'Отмена'))
-	# 	keyboard.add(*butns)
-	# 	return keyboard
 
 	def write_lesson(self, teacher=None, students=None):
 		global current_subject
 		global writing_date
-		# print ("На запись")
-		# global who_is_absent
-		# print (type(writing_date))
 
 		# writing_date = datetime.strptime(writing_date, "%d.%m.%y")
 		lesson_list = []
@@ -321,7 +274,7 @@ def menu(text):
 
 @bot.message_handler(commands = ['file'])
 def give_file(text):
-	if text.from_user.id in (325726476 , 223103214):
+	if text.from_user.id in (id1 , id2):
 		doc = open('my_journal.xlsx', 'rb')
 		bot.send_document(chat_id= text.chat.id, data = doc)
 		doc.close()
@@ -511,11 +464,6 @@ def func(text):
 									  text = "Выберите дни недели проведения этого занятия", reply_markup = keyboard_subjects(weeks_day_copy))
 				
 
-# struct_for_excel = {"Имя преподавателя": "", # записывается после представьтесь
-# 					  "Группы": [
-# 									
-# 							]
-# 					}
 group_info = {"Название группы": "", 
 			  "Ученики": [],
 			  "Расписание":[]}
@@ -539,20 +487,3 @@ def create_timetable(text):
 		elif step_for_construct == 3:
 			students.append(text.text)
 	pass
-# bot.polling()
-
-# bot.remove_webhook()
-
-#  # Ставим заново вебхук
-# bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-#                 certificate=open(WEBHOOK_SSL_CERT, 'r'))
-# cherrypy.config.update({
-#     'server.socket_host': WEBHOOK_LISTEN,
-#     'server.socket_port': WEBHOOK_PORT,
-#     'server.ssl_module': 'builtin',
-#     'server.ssl_certificate': WEBHOOK_SSL_CERT,
-#     'server.ssl_private_key': WEBHOOK_SSL_PRIV
-# })
-
-#  # Собственно, запуск!
-# cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
